@@ -1,1 +1,83 @@
 // hellow world
+lrecWMSCompletedOrders.FINDFIRST() THEN BEGIN
+ltxtReference := COPYSTR(lrecWMSCompletedOrders.Reference, 1, 30);
+IF ltxtReference = '' THEN
+ltxtReference := lrecWMSCompletedOrders."Document No.";
+END;
+
+
+
+CreateEDIDocument(lrecEDIDocument);
+
+
+
+// Create file
+// ----
+lcunFileMgmt.CreateServerFolder("Path New Files");
+ltFileName := lcunComTools.GetNewFilename(1, Code, '', ltxtReference, '');
+ltxtExportFile := lcunComTools.GetFileName(ltFileName, "Path New Files");
+"File To Process" := ltFileName;
+
+
+
+CASE "Export processing type" OF
+// Report
+// ----
+"Export processing type"::Report:
+BEGIN
+lrecWMSRegTransaction.RESET();
+lrecWMSRegTransaction.SETCURRENTKEY( "Transaction Type", "Source Type", "Source Subtype", "Source Document No.");
+IF "Source Subtype" = 0 THEN
+lrecWMSRegTransaction.SETRANGE( "Transaction Type", lrecWMSRegTransaction."Transaction Type"::Receipt)
+ELSE lrecWMSRegTransaction.SETRANGE( "Transaction Type", lrecWMSRegTransaction."Transaction Type"::Delivery);
+lrecWMSRegTransaction.SETRANGE( "Source Type", DATABASE::"WMS Completed Orders");
+lrecWMSRegTransaction.SETRANGE( "Source Subtype", "Source Subtype");
+lrecWMSRegTransaction.SETRANGE( "Source Document No.", "Source No.");
+lrecWMSRegTransaction.FINDFIRST;
+
+
+
+IF NOT REPORT.SAVEASPDF("Export processing object ID", ltxtExportFile, lrecWMSRegTransaction) THEN
+IF REPORT.SAVEASPDF("Export processing object ID", ltxtExportFile, lrecWMSCompletedOrders) THEN;
+END;
+// XmlPort
+// ----
+"Export processing type"::XMLport:
+BEGIN
+CASE "Export processing object ID" OF
+2002618:
+BEGIN
+lfFileToExport.CREATE(ltxtExportFile);
+lfFileToExport.CREATEOUTSTREAM(lostrmFile);
+lxmlExportOrders.SetExportCode(Rec);
+lxmlExportOrders.SETDESTINATION(lostrmFile);
+lxmlExportOrders.EXPORT();
+lfFileToExport.CLOSE();
+END;
+END;
+END;
+// Use XMLport "WMS Export Orders" if no export processing type was specified
+// ----
+ELSE BEGIN
+lfFileToExport.CREATE(ltxtExportFile);
+lfFileToExport.CREATEOUTSTREAM(lostrmFile);
+lxmlExportOrders.SetExportCode(Rec);
+lxmlExportOrders.SETDESTINATION(lostrmFile);
+lxmlExportOrders.EXPORT();
+lfFileToExport.CLOSE();
+END
+END;
+END;
+
+
+
+}
+CODE
+{
+
+
+
+BEGIN
+END.
+}
+}
